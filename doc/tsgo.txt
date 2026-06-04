@@ -1,0 +1,85 @@
+*tsgo.nvim* TypeScript tsgo companion for Neovim
+
+==============================================================================
+CONTENTS                                                        *tsgo-contents*
+
+1. Introduction                                      |tsgo-introduction|
+2. Setup                                             |tsgo-setup|
+3. Commands                                          |tsgo-commands|
+4. Lua API                                           |tsgo-api|
+
+==============================================================================
+INTRODUCTION                                                *tsgo-introduction*
+
+tsgo.nvim adds ergonomic commands around the native TypeScript tsgo LSP server.
+It does not wrap tsgo or translate protocols. The server already speaks LSP.
+
+The main feature is import hygiene: a single command that adds missing imports,
+removes unused imports, and organizes imports.
+
+==============================================================================
+SETUP                                                            *tsgo-setup*
+
+>
+  require("tsgo").setup({
+    keymaps = { enable = true },
+  })
+<
+
+By default, setup registers the tsgo LSP config when |vim.lsp.config()| is
+available:
+>
+  cmd = { "tsgo", "--lsp", "-stdio" }
+<
+
+If another plugin owns LSP setup:
+>
+  require("tsgo").setup({
+    setup_lsp = false,
+    keymaps = { enable = true },
+  })
+<
+
+==============================================================================
+COMMANDS                                                      *tsgo-commands*
+
+                                                        *:TsgoOrganizeImports*
+:TsgoOrganizeImports
+    Run the source.organizeImports LSP code action.
+
+                                                        *:TsgoAddMissingImports*
+:TsgoAddMissingImports
+    Run the source.addMissingImports.ts LSP code action.
+
+                                                        *:TsgoRemoveUnused*
+:TsgoRemoveUnused
+    Run the source.removeUnused.ts LSP code action.
+
+                                                        *:TsgoFixAll*
+:TsgoFixAll
+    Run the source.fixAll.ts LSP code action.
+
+                                                        *:TsgoImports*
+:TsgoImports
+    Add missing imports, remove unused imports, and organize imports.
+
+:TsgoImports!
+    Run import hygiene and format afterward.
+
+                                                        *:TsgoSourceDefinition*
+:TsgoSourceDefinition
+    Try TypeScript source definition and fall back to standard LSP definition.
+
+==============================================================================
+LUA API                                                           *tsgo-api*
+
+>
+  require("tsgo").actions.organize_imports()
+  require("tsgo").actions.add_missing_imports()
+  require("tsgo").actions.remove_unused()
+  require("tsgo").actions.fix_all()
+  require("tsgo").actions.imports({ format = true })
+  require("tsgo").actions.source_definition()
+<
+
+vim:tw=78:ts=8:ft=help:norl:
