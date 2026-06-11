@@ -39,6 +39,10 @@ local function is_ts_buffer(bufnr)
   return state.filetypes[filetype] == true
 end
 
+local function is_tsgo_client_name(name)
+  return name == "tsgo" or name:match("^tsgo[._-]") ~= nil
+end
+
 local function tsgo_clients(bufnr)
   local clients = vim.lsp.get_clients({ bufnr = bufnr, name = state.client_name })
   if #clients > 0 then
@@ -46,7 +50,7 @@ local function tsgo_clients(bufnr)
   end
 
   return vim.tbl_filter(function(client)
-    return client.name:match("tsgo") ~= nil
+    return is_tsgo_client_name(client.name)
   end, vim.lsp.get_clients({ bufnr = bufnr }))
 end
 
@@ -64,19 +68,47 @@ local function assert_ready(bufnr)
   return true
 end
 
+local function code_action_command(action)
+  if type(action.command) == "table" then
+    return action.command
+  end
+
+  if type(action.command) == "string" then
+    return {
+      command = action.command,
+      arguments = action.arguments or {},
+      title = action.title,
+    }
+  end
+
+  return nil
+end
+
 local function apply_code_action(action, client)
   if action.edit then
     vim.lsp.util.apply_workspace_edit(action.edit, client.offset_encoding)
   end
 
   if action.command then
-    local command = type(action.command) == "table" and action.command or action
-    client.request("workspace/executeCommand", command, function(err)
-      if err then
-        notify(err.message or "Failed to execute tsgo command.", vim.log.levels.ERROR)
-      end
-    end)
+    local command = code_action_command(action)
+    if not command then
+      notify("Invalid tsgo command action.", vim.log.levels.ERROR)
+      return false
+    end
+
+    local response = client.request_sync("workspace/executeCommand", command, state.timeout_ms)
+    if response and response.err then
+      notify(response.err.message or "Failed to execute tsgo command.", vim.log.levels.ERROR)
+      return false
+    end
+
+    if not response then
+      notify("Timed out executing tsgo command.", vim.log.levels.ERROR)
+      return false
+    end
   end
+
+  return true
 end
 
 local function code_action_sync(kind, opts)
@@ -87,13 +119,19 @@ local function code_action_sync(kind, opts)
     return false
   end
 
-  local params = vim.lsp.util.make_range_params(0, "utf-16")
+  local clients = tsgo_clients(bufnr)
+  local client_by_id = {}
+  for _, client in ipairs(clients) do
+    client_by_id[client.id] = client
+  end
+
+  local client = clients[1]
+  local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
   params.context = {
-    diagnostics = vim.diagnostic.get(bufnr),
+    diagnostics = {},
     only = { kind },
   }
 
-  local clients = tsgo_clients(bufnr)
   local responses = vim.lsp.buf_request_sync(bufnr, "textDocument/codeAction", params, state.timeout_ms)
   local applied = false
 
@@ -103,15 +141,13 @@ local function code_action_sync(kind, opts)
     end
 
     for _, action in ipairs(response.result or {}) do
-      if action.kind == kind or (action.kind and action.kind:find(kind, 1, true) == 1) then
-        local client = vim.tbl_filter(function(item)
-          return item.id == client_id
-        end, clients)[1] or vim.lsp.get_client_by_id(client_id)
+      if action.kind and action.kind:find(kind, 1, true) == 1 then
+        local action_client = client_by_id[client_id] or vim.lsp.get_client_by_id(client_id)
 
-        if client then
-          apply_code_action(action, client)
-          applied = true
-          if not opts.apply_all then
+        if action_client then
+          local ok = apply_code_action(action, action_client)
+          applied = ok or applied
+          if ok and not opts.apply_all then
             return true
           end
         end
@@ -198,8 +234,8 @@ function M.source_definition(opts)
     return
   end
 
-  local params = vim.lsp.util.make_position_params(0, "utf-16")
   local client = tsgo_clients(bufnr)[1]
+  local params = vim.lsp.util.make_position_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
 
   client.request("workspace/executeCommand", {
     command = "typescript.goToSourceDefinition",

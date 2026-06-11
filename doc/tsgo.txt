@@ -6,23 +6,32 @@ CONTENTS                                                        *tsgo-contents*
 1. Introduction                                      |tsgo-introduction|
 2. Setup                                             |tsgo-setup|
 3. Commands                                          |tsgo-commands|
-4. Lua API                                           |tsgo-api|
+4. Inlay Hints                                       |tsgo-inlay-hints|
+5. Lua API                                           |tsgo-api|
 
 ==============================================================================
 INTRODUCTION                                                *tsgo-introduction*
 
-tsgo.nvim adds ergonomic commands around the native TypeScript tsgo LSP server.
-It does not wrap tsgo or translate protocols. The server already speaks LSP.
+tsgo.nvim adds a VS Code-like editor-experience layer around the native
+TypeScript tsgo LSP server. It does not wrap tsgo or translate protocols. The
+server already speaks LSP.
 
 The main feature is import hygiene: a single command that adds missing imports,
 removes unused imports, and organizes imports.
+
+It also exposes completion polish helpers for completion engines such as
+blink.cmp, runtime inspection, and health checks.
 
 ==============================================================================
 SETUP                                                            *tsgo-setup*
 
 >
   require("tsgo").setup({
-    keymaps = { enable = true },
+    inlay_hints = { auto_enable = true },
+    keymaps = {
+      enable = true,
+      imports_format = "<leader>iI",
+    },
   })
 <
 
@@ -66,9 +75,49 @@ COMMANDS                                                      *tsgo-commands*
 :TsgoImports!
     Run import hygiene and format afterward.
 
+Set keymaps.imports_format to bind the same workflow as |:TsgoImports!|.
+
                                                         *:TsgoSourceDefinition*
 :TsgoSourceDefinition
     Try TypeScript source definition and fall back to standard LSP definition.
+
+                                                        *:TsgoSignatureHelp*
+:TsgoSignatureHelp
+    Request tsgo signature help with VS Code-like context so documentation-rich
+    signatures are shown when the server returns them.
+
+                                                        *:TsgoToggleInlayHints*
+:TsgoToggleInlayHints
+    Toggle Neovim's inlay hint renderer for the current buffer.
+
+                                                        *:TsgoInfo*
+:TsgoInfo
+    Show the resolved tsgo command, executable availability, and active client
+    count.
+
+==============================================================================
+INLAY HINTS                                                *tsgo-inlay-hints*
+
+tsgo advertises inlay hints, but the TypeScript hint categories need to be
+enabled through settings. tsgo.nvim enables a quiet default for both JavaScript
+and TypeScript: parameter-name hints for literals and enum member value hints.
+Variable, parameter type, property type, and function return hints are off by
+default because they tend to add too much visual noise.
+
+Override the settings if you want more type hints:
+>
+  require("tsgo").setup({
+    settings = {
+      typescript = {
+        inlayHints = {
+          parameterTypes = { enabled = true },
+          variableTypes = { enabled = true },
+          functionLikeReturnTypes = { enabled = true },
+        },
+      },
+    },
+  })
+<
 
 ==============================================================================
 LUA API                                                           *tsgo-api*
@@ -80,6 +129,36 @@ LUA API                                                           *tsgo-api*
   require("tsgo").actions.fix_all()
   require("tsgo").actions.imports({ format = true })
   require("tsgo").actions.source_definition()
+  require("tsgo").inlay_hints.toggle()
+  require("tsgo").signature.help()
+  require("tsgo").compat.blink()
+<
+
+Use the blink.cmp compatibility patch by merging it into your blink config:
+>
+  local tsgo_blink = require("tsgo").compat.blink()
+  require("blink.cmp").setup(vim.tbl_deep_extend("force", {
+    -- your blink config
+  }, tsgo_blink))
+<
+
+By default, the blink patch buckets typed member completions by prefix match, so
+`.len` ranks `length` before fuzzy typo matches like `entries`.
+Blank member completion after just `.` still preserves TypeScript's LSP
+sortText ordering.
+
+Disable that sorter if you want pure blink/LSP ordering:
+>
+  local tsgo_blink = require("tsgo").compat.blink({
+    completion = {
+      member_prefix_sort = false,
+    },
+  })
+<
+
+Run health checks with:
+>
+  :checkhealth tsgo
 <
 
 vim:tw=78:ts=8:ft=help:norl:
