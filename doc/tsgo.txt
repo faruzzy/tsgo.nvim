@@ -100,9 +100,9 @@ INLAY HINTS                                                *tsgo-inlay-hints*
 
 tsgo advertises inlay hints, but the TypeScript hint categories need to be
 enabled through settings. tsgo.nvim enables a quiet default for both JavaScript
-and TypeScript: parameter-name hints for literals and enum member value hints.
-Variable, parameter type, property type, and function return hints are off by
-default because they tend to add too much visual noise.
+and TypeScript: parameter-name hints for all arguments and enum member value
+hints. Variable, parameter type, property type, and function return hints are
+off by default because they tend to add too much visual noise.
 
 Override the settings if you want more type hints:
 >

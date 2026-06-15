@@ -18,7 +18,7 @@ M.defaults = {
   settings = {
     typescript = {
       inlayHints = {
-        parameterNames = { enabled = "literals" },
+        parameterNames = { enabled = "all" },
         parameterTypes = { enabled = false },
         variableTypes = { enabled = false },
         propertyDeclarationTypes = { enabled = false },
@@ -28,7 +28,7 @@ M.defaults = {
     },
     javascript = {
       inlayHints = {
-        parameterNames = { enabled = "literals" },
+        parameterNames = { enabled = "all" },
         parameterTypes = { enabled = false },
         variableTypes = { enabled = false },
         propertyDeclarationTypes = { enabled = false },

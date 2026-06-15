@@ -197,7 +197,7 @@ native LSP config API, and that no conflicting TypeScript LSP clients are active
 
 tsgo advertises inlay hints, but the TypeScript hint categories need to be
 enabled through settings. tsgo.nvim enables a quiet VS Code-like default for
-both JavaScript and TypeScript: parameter-name hints for literals and enum
+both JavaScript and TypeScript: parameter-name hints for all arguments and enum
 member value hints. Variable, parameter type, property type, and function return
 hints are off by default because they tend to add too much visual noise.
 
@@ -211,7 +211,7 @@ require("tsgo").setup({
   settings = {
     typescript = {
       inlayHints = {
-        parameterNames = { enabled = "literals" },
+        parameterNames = { enabled = "all" },
         parameterTypes = { enabled = true },
         variableTypes = { enabled = true },
         functionLikeReturnTypes = { enabled = true },
