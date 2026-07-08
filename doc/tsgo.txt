@@ -142,10 +142,13 @@ Use the blink.cmp compatibility patch by merging it into your blink config:
   }, tsgo_blink))
 <
 
-By default, the blink patch buckets typed member completions by prefix match, so
-`.len` ranks `length` before fuzzy typo matches like `entries`.
-Blank member completion after just `.` still preserves TypeScript's LSP
-sortText ordering.
+By default, the blink patch prefers matching LSP items over buffer words when
+the typed prefix matches. In object literal property lists, typed prefixes can
+surface matching buffer words, blank property lists keep LSP properties ahead of
+buffer words, and required properties rank before optional ones. It also buckets
+typed member completions by prefix match, so `.len` ranks `length` before fuzzy
+typo matches like `entries`. Blank member completion after just `.` still
+preserves TypeScript's LSP sortText ordering.
 
 Disable that sorter if you want pure blink/LSP ordering:
 >

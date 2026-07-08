@@ -111,6 +111,10 @@ list focused on object members. tsgo.nvim exposes a blink.cmp patch that:
 - uses only LSP suggestions during member access,
 - filters tsgo text/keyword noise from member lists,
 - filters tsgo text noise on blank manual completion,
+- prefers matching LSP items over buffer words when the typed prefix matches,
+- lets typed object-property prefixes surface matching buffer words,
+- prefers LSP properties over buffer words in blank object literal property lists,
+- ranks required object properties before optional ones,
 - uses prefix matching so `array.le` ranks as `le` instead of the whole line,
 - buckets typed member completions by prefix match, so `.len` ranks `length`
   before fuzzy typo matches like `entries`,

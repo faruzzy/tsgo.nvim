@@ -19,6 +19,19 @@ local function label_starts_with_prefix(label, prefix)
   return tostring(label or ""):lower():sub(1, #prefix) == prefix
 end
 
+local function item_starts_with_prefix(item, prefix)
+  return (
+    label_starts_with_prefix(item.label, prefix)
+    or label_starts_with_prefix(item.filterText, prefix)
+    or label_starts_with_prefix(item.insertText, prefix)
+    or (item.textEdit and label_starts_with_prefix(item.textEdit.newText, prefix))
+  ) == true
+end
+
+local function is_optional_property(item)
+  return tostring(item.label or ""):sub(-1) == "?"
+end
+
 local function apply_member_prefix_sort(item, prefix)
   local bucket = label_starts_with_prefix(item.label, prefix) and "0" or "1"
   item.sortText = bucket .. ":" .. tostring(item.sortText or item.label or "")
@@ -107,19 +120,124 @@ function M.member_prefix_first(a, b)
   return nil
 end
 
+function M.lsp_word_prefix_first(a, b)
+  if a.source_id == b.source_id then
+    return nil
+  end
+
+  local lsp_item = a.source_id == "lsp" and a or b.source_id == "lsp" and b or nil
+  local buffer_item = a.source_id == "buffer" and a or b.source_id == "buffer" and b or nil
+  if not lsp_item or not buffer_item then
+    return nil
+  end
+
+  local prefix = util.word_prefix()
+  if not prefix or prefix == "" then
+    return nil
+  end
+
+  prefix = prefix:lower()
+  if not item_starts_with_prefix(lsp_item, prefix) then
+    return nil
+  end
+
+  return a.source_id == "lsp"
+end
+
+function M.lsp_object_property_first(a, b)
+  if a.source_id == b.source_id or not util.is_object_property_completion() then
+    return nil
+  end
+
+  local prefix = util.object_property_prefix_from_context()
+  if prefix and prefix ~= "" then
+    return nil
+  end
+
+  local lsp_item = a.source_id == "lsp" and a or b.source_id == "lsp" and b or nil
+  local buffer_item = a.source_id == "buffer" and a or b.source_id == "buffer" and b or nil
+  if not lsp_item or not buffer_item then
+    return nil
+  end
+
+  return a.source_id == "lsp"
+end
+
+function M.object_property_prefix_match_first(a, b)
+  local prefix = util.object_property_prefix_from_context()
+  if not prefix or prefix == "" then
+    return nil
+  end
+
+  prefix = prefix:lower()
+
+  local a_matches = item_starts_with_prefix(a, prefix)
+  local b_matches = item_starts_with_prefix(b, prefix)
+  if a_matches ~= b_matches then
+    return a_matches
+  end
+
+  return nil
+end
+
+function M.required_property_first(a, b)
+  if a.source_id ~= b.source_id or not util.is_object_property_completion() then
+    return nil
+  end
+
+  local a_optional = is_optional_property(a)
+  local b_optional = is_optional_property(b)
+  if a_optional ~= b_optional then
+    return not a_optional
+  end
+
+  return nil
+end
+
 function M.blink_sorts(opts)
   opts = opts or {}
 
   local member_prefix = util.member_prefix()
   if member_prefix and member_prefix ~= "" then
     if opts.member_prefix_sort ~= false then
-      return { "exact", M.member_prefix_first, "score", "sort_text", "label", "kind" }
+      return {
+        M.object_property_prefix_match_first,
+        M.lsp_object_property_first,
+        M.required_property_first,
+        M.lsp_word_prefix_first,
+        "exact",
+        M.member_prefix_first,
+        "score",
+        "sort_text",
+        "label",
+        "kind",
+      }
     end
 
-    return { "exact", "score", "sort_text", "label", "kind" }
+    return {
+      M.object_property_prefix_match_first,
+      M.lsp_object_property_first,
+      M.required_property_first,
+      M.lsp_word_prefix_first,
+      "exact",
+      "score",
+      "sort_text",
+      "label",
+      "kind",
+    }
   end
 
-  return { "exact", "sort_text", "label", "score", "kind" }
+  return {
+    M.object_property_prefix_match_first,
+    M.lsp_object_property_first,
+    M.required_property_first,
+    M.lsp_word_prefix_first,
+    "exact",
+    "sort_text",
+    "label",
+    "score",
+    "kind",
+  }
 end
 
 function M.blink_patch(opts)

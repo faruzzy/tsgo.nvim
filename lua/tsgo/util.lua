@@ -65,4 +65,36 @@ function M.has_blank_prefix()
   return vim.api.nvim_get_current_line():sub(1, col):match("^%s*$") ~= nil
 end
 
+function M.object_property_prefix_at(line, col)
+  if col < 0 then
+    return nil
+  end
+
+  local before_cursor = line:sub(1, math.min(#line, col))
+  if before_cursor:match("[:%.]%s*[%w_$]*$") then
+    return nil
+  end
+
+  return before_cursor:match("^%s*([%w_$]*)$") or before_cursor:match("[{,]%s*([%w_$]*)$")
+end
+
+function M.object_property_prefix_from_context(ctx)
+  if ctx and ctx.line and ctx.cursor and ctx.cursor[2] then
+    return M.object_property_prefix_at(ctx.line, ctx.cursor[2])
+  end
+
+  local col = vim.api.nvim_win_get_cursor(0)[2]
+  return M.object_property_prefix_at(vim.api.nvim_get_current_line(), col)
+end
+
+function M.is_object_property_completion()
+  return M.object_property_prefix_from_context() ~= nil
+end
+
+function M.word_prefix()
+  local col = vim.api.nvim_win_get_cursor(0)[2]
+  local before_cursor = vim.api.nvim_get_current_line():sub(1, col)
+  return before_cursor:match("([%w_$]+)$")
+end
+
 return M
