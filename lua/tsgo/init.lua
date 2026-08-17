@@ -4,6 +4,8 @@ local completion = require("tsgo.completion")
 local config = require("tsgo.config")
 local diagnostics = require("tsgo.diagnostics")
 local inlay_hints = require("tsgo.inlay_hints")
+local lifecycle = require("tsgo.lifecycle")
+local root = require("tsgo.root")
 local signature = require("tsgo.signature")
 local util = require("tsgo.util")
 
@@ -19,7 +21,7 @@ local function configure_lsp(opts)
   local lsp_config = {
     cmd = cmd.resolve(opts),
     filetypes = opts.filetypes,
-    root_markers = opts.root_markers,
+    root_dir = root.root_dir(),
     settings = opts.settings,
   }
 
@@ -95,6 +97,24 @@ local function create_commands()
       { title = "tsgo.nvim" }
     )
   end, "Show tsgo.nvim runtime information")
+
+  user_command("TsgoStop", function(command)
+    lifecycle.stop({ force = command.bang })
+  end, {
+    bang = true,
+    desc = "Stop active tsgo clients and disable tsgo auto-start",
+  })
+
+  user_command("TsgoStart", function()
+    lifecycle.start()
+  end, "Enable tsgo auto-start")
+
+  user_command("TsgoRestart", function(command)
+    lifecycle.restart({ force = command.bang })
+  end, {
+    bang = true,
+    desc = "Restart active tsgo clients",
+  })
 end
 
 local function map(bufnr, lhs, rhs, desc)
@@ -179,6 +199,15 @@ function M.setup(opts)
   })
   completion.configure(vim.tbl_deep_extend("force", opts.completion, { client_name = opts.client_name }))
   inlay_hints.configure(vim.tbl_deep_extend("force", opts.inlay_hints, { client_name = opts.client_name }))
+  root.configure({
+    project_root_markers = opts.project_root_markers,
+    fallback_root_markers = opts.fallback_root_markers,
+    allow_inferred_project = opts.allow_inferred_project,
+  })
+  lifecycle.configure({
+    client_name = opts.client_name,
+    setup_lsp = opts.setup_lsp,
+  })
   signature.configure({
     client_name = opts.client_name,
     timeout_ms = opts.timeout_ms,
@@ -197,6 +226,8 @@ M.completion = completion
 M.compat = require("tsgo.compat")
 M.health = require("tsgo.health")
 M.inlay_hints = inlay_hints
+M.lifecycle = lifecycle
+M.root = root
 M.signature = signature
 
 return M

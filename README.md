@@ -74,9 +74,23 @@ vim.lsp.config("tsgo", {
     "typescriptreact",
     "typescript.tsx",
   },
-  root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
+  root_dir = function(bufnr, on_dir)
+    -- Starts only when tsconfig.json or jsconfig.json is found.
+  end,
 })
 vim.lsp.enable("tsgo")
+```
+
+By default, tsgo.nvim avoids TypeScript's inferred-project mode and only starts
+`tsgo` for files under `tsconfig.json` or `jsconfig.json`. This keeps projects
+with nonstandard config names, generated output, or package-only roots from
+causing expensive server-side project discovery. To allow package.json/.git
+fallback roots anyway:
+
+```lua
+require("tsgo").setup({
+  allow_inferred_project = true,
+})
 ```
 
 If you already configure `tsgo` elsewhere, disable that part:
@@ -163,6 +177,11 @@ local tsgo_blink = require("tsgo").compat.blink({
 - `:TsgoSignatureHelp` requests tsgo signature help with VS Code-like context.
 - `:TsgoToggleInlayHints`
 - `:TsgoInfo` shows the resolved command and active tsgo clients.
+- `:TsgoStop` stops active tsgo clients and disables tsgo auto-start.
+- `:TsgoStop!` force-stops active tsgo clients.
+- `:TsgoStart` enables tsgo auto-start again.
+- `:TsgoRestart` restarts tsgo.
+- `:TsgoRestart!` force-stops active tsgo clients before restarting.
 
 The extra command is `:TsgoImports`: it chains add-missing imports,
 remove-unused imports, and organize-imports into one import cleanup workflow.
@@ -181,6 +200,10 @@ tsgo.actions.fix_all()
 tsgo.actions.imports({ format = true })
 tsgo.actions.source_definition()
 tsgo.inlay_hints.toggle()
+tsgo.lifecycle.stop()
+tsgo.lifecycle.start()
+tsgo.lifecycle.restart()
+tsgo.root.find(vim.api.nvim_buf_get_name(0))
 tsgo.signature.help()
 
 local blink_patch = tsgo.compat.blink()

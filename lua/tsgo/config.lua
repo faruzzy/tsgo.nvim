@@ -6,6 +6,7 @@ M.defaults = {
   cmd = nil,
   executable = "tsgo",
   args = { "--lsp", "-stdio" },
+  allow_inferred_project = false,
   filetypes = {
     "javascript",
     "javascriptreact",
@@ -14,7 +15,8 @@ M.defaults = {
     "typescriptreact",
     "typescript.tsx",
   },
-  root_markers = { "tsconfig.json", "jsconfig.json", "package.json", ".git" },
+  project_root_markers = { "tsconfig.json", "jsconfig.json" },
+  fallback_root_markers = { "package.json", ".git" },
   settings = {
     typescript = {
       inlayHints = {

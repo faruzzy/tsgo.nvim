@@ -41,6 +41,15 @@ available:
   cmd = { "tsgo", "--lsp", "-stdio" }
 <
 
+tsgo.nvim starts tsgo only when it finds tsconfig.json or jsconfig.json. This
+avoids TypeScript inferred-project mode, which can be expensive in package-only
+or generated-code-heavy projects.
+>
+  require("tsgo").setup({
+    allow_inferred_project = true,
+  })
+<
+
 If another plugin owns LSP setup:
 >
   require("tsgo").setup({
@@ -94,6 +103,24 @@ Set keymaps.imports_format to bind the same workflow as |:TsgoImports!|.
 :TsgoInfo
     Show the resolved tsgo command, executable availability, and active client
     count.
+
+                                                        *:TsgoStop*
+:TsgoStop
+    Stop active tsgo clients and disable tsgo auto-start.
+
+:TsgoStop!
+    Force-stop active tsgo clients and disable tsgo auto-start.
+
+                                                        *:TsgoStart*
+:TsgoStart
+    Enable tsgo auto-start again.
+
+                                                        *:TsgoRestart*
+:TsgoRestart
+    Restart tsgo clients.
+
+:TsgoRestart!
+    Force-stop active tsgo clients before restarting.
 
 ==============================================================================
 INLAY HINTS                                                *tsgo-inlay-hints*
