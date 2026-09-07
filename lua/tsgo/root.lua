@@ -33,6 +33,10 @@ local function find_root(path, markers)
   return marker and vim.fs.dirname(marker) or nil
 end
 
+local function is_at_or_under(path, root)
+  return path == root or path:sub(1, #root + 1) == root .. "/"
+end
+
 function M.configure(opts)
   state.project_root_markers = opts.project_root_markers or state.project_root_markers
   state.fallback_root_markers = opts.fallback_root_markers or state.fallback_root_markers
@@ -42,6 +46,11 @@ end
 function M.find(path)
   local root = find_root(path, state.project_root_markers)
   if root then
+    local boundary = find_root(path, state.fallback_root_markers)
+    if boundary and not is_at_or_under(root, boundary) then
+      return nil
+    end
+
     return root
   end
 
