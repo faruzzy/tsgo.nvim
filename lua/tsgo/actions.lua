@@ -120,36 +120,27 @@ local function code_action_sync(kind, opts)
   end
 
   local clients = tsgo_clients(bufnr)
-  local client_by_id = {}
-  for _, client in ipairs(clients) do
-    client_by_id[client.id] = client
-  end
-
-  local client = clients[1]
-  local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
-  params.context = {
-    diagnostics = {},
-    only = { kind },
-  }
-
-  local responses = vim.lsp.buf_request_sync(bufnr, "textDocument/codeAction", params, state.timeout_ms)
   local applied = false
 
-  for client_id, response in pairs(responses or {}) do
-    if response.error then
-      notify(response.error.message or ("Code action failed: " .. kind), vim.log.levels.ERROR)
+  for _, client in ipairs(clients) do
+    local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
+    params.context = {
+      diagnostics = {},
+      only = { kind },
+    }
+
+    local response = client:request_sync("textDocument/codeAction", params, state.timeout_ms, bufnr)
+
+    if response and response.err then
+      notify(response.err.message or ("Code action failed: " .. kind), vim.log.levels.ERROR)
     end
 
-    for _, action in ipairs(response.result or {}) do
+    for _, action in ipairs((response and response.result) or {}) do
       if action.kind and action.kind:find(kind, 1, true) == 1 then
-        local action_client = client_by_id[client_id] or vim.lsp.get_client_by_id(client_id)
-
-        if action_client then
-          local ok = apply_code_action(action, action_client)
-          applied = ok or applied
-          if ok and not opts.apply_all then
-            return true
-          end
+        local ok = apply_code_action(action, client)
+        applied = ok or applied
+        if ok and not opts.apply_all then
+          return true
         end
       end
     end
@@ -207,21 +198,25 @@ function M.organize_imports(opts)
 end
 
 function M.add_missing_imports(opts)
-  return code_action_sync("source.addMissingImports.ts", opts)
+  return code_action_sync("source.addMissingImports", opts)
 end
 
 function M.remove_unused(opts)
-  return code_action_sync("source.removeUnused.ts", opts)
+  return code_action_sync("source.removeUnusedImports", opts)
 end
 
 function M.fix_all(opts)
-  return code_action_sync("source.fixAll.ts", opts)
+  return code_action_sync("source.fixAll", opts)
+end
+
+function M.sort_imports(opts)
+  return code_action_sync("source.sortImports", opts)
 end
 
 function M.imports(opts)
   return run_many({
-    "source.addMissingImports.ts",
-    "source.removeUnused.ts",
+    "source.addMissingImports",
+    "source.removeUnusedImports",
     "source.organizeImports",
   }, opts)
 end
