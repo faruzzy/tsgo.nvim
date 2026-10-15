@@ -67,7 +67,9 @@ COMMANDS                                                      *tsgo-commands*
 
                                                         *:TsgoAddMissingImports*
 :TsgoAddMissingImports
-    Run the source.addMissingImports.ts LSP code action.
+    Run the source.addMissingImports.ts LSP code action. When the server
+    does not advertise that kind, fall back to the import quickfixes on
+    missing-name diagnostics ("Add all missing imports").
 
                                                         *:TsgoRemoveUnused*
 :TsgoRemoveUnused

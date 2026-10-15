@@ -111,6 +111,112 @@ local function apply_code_action(action, client)
   return true
 end
 
+local ADD_MISSING_IMPORTS = "source.addMissingImports"
+
+-- TypeScript diagnostic codes the missing-import quickfix responds to.
+local MISSING_NAME_CODES = {
+  [2304] = true, -- Cannot find name
+  [2503] = true, -- Cannot find namespace
+  [2552] = true, -- Cannot find name, did you mean
+  [2662] = true, -- Cannot find name, did you mean the static member
+  [2663] = true, -- Cannot find name, did you mean the instance member
+  [2686] = true, -- Refers to a UMD global
+  [2693] = true, -- Only refers to a type, but is being used as a value
+  [2749] = true, -- Refers to a value, but is being used as a type
+  [18004] = true, -- No value exists in scope for the shorthand property
+}
+
+local function supports_code_action_kind(client, kind)
+  local provider = client.server_capabilities.codeActionProvider
+  if type(provider) ~= "table" or not provider.codeActionKinds then
+    return true
+  end
+
+  for _, supported in ipairs(provider.codeActionKinds) do
+    if kind == supported or vim.startswith(kind, supported .. ".") then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function missing_name_diagnostics(client, bufnr)
+  local items
+
+  if client.server_capabilities.diagnosticProvider then
+    local response = client:request_sync("textDocument/diagnostic", {
+      textDocument = vim.lsp.util.make_text_document_params(bufnr),
+    }, state.timeout_ms, bufnr)
+    items = response and response.result and response.result.items
+  end
+
+  if not items then
+    items = {}
+    for _, diagnostic in ipairs(vim.diagnostic.get(bufnr)) do
+      local lsp_diagnostic = diagnostic.user_data and diagnostic.user_data.lsp
+      if lsp_diagnostic then
+        table.insert(items, lsp_diagnostic)
+      end
+    end
+  end
+
+  return vim.tbl_filter(function(item)
+    return MISSING_NAME_CODES[tonumber(item.code)] == true
+  end, items)
+end
+
+local function import_quickfixes(client, bufnr, diagnostic)
+  local response = client:request_sync("textDocument/codeAction", {
+    textDocument = vim.lsp.util.make_text_document_params(bufnr),
+    range = diagnostic.range,
+    context = { diagnostics = { diagnostic }, only = { "quickfix" } },
+  }, state.timeout_ms, bufnr)
+
+  local fix_all, single
+  for _, action in ipairs((response and response.result) or {}) do
+    local title = action.title or ""
+    if title == "Add all missing imports" then
+      fix_all = fix_all or action
+    elseif vim.startswith(title, "Add import from") or vim.startswith(title, "Update import from") then
+      single = single or action
+    end
+  end
+
+  return fix_all, single
+end
+
+-- tsgo does not advertise source.addMissingImports yet, so fall back to the
+-- per-diagnostic import quickfixes, preferring the "Add all missing imports" fix.
+local function add_missing_imports_via_quickfix(client, bufnr)
+  local applied = false
+
+  -- Each applied edit shifts positions, so diagnostics are re-fetched per pass.
+  for _ = 1, 50 do
+    local applied_this_pass = false
+
+    for _, diagnostic in ipairs(missing_name_diagnostics(client, bufnr)) do
+      local fix_all, single = import_quickfixes(client, bufnr, diagnostic)
+
+      if fix_all then
+        return apply_code_action(fix_all, client) or applied
+      end
+
+      if single and apply_code_action(single, client) then
+        applied = true
+        applied_this_pass = true
+        break
+      end
+    end
+
+    if not applied_this_pass then
+      break
+    end
+  end
+
+  return applied
+end
+
 local function code_action_sync(kind, opts)
   opts = opts or {}
   local bufnr = current_bufnr(opts.bufnr)
@@ -123,24 +229,32 @@ local function code_action_sync(kind, opts)
   local applied = false
 
   for _, client in ipairs(clients) do
-    local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
-    params.context = {
-      diagnostics = {},
-      only = { kind },
-    }
+    if kind == ADD_MISSING_IMPORTS and not supports_code_action_kind(client, kind) then
+      local ok = add_missing_imports_via_quickfix(client, bufnr)
+      applied = ok or applied
+      if ok and not opts.apply_all then
+        return true
+      end
+    else
+      local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
+      params.context = {
+        diagnostics = {},
+        only = { kind },
+      }
 
-    local response = client:request_sync("textDocument/codeAction", params, state.timeout_ms, bufnr)
+      local response = client:request_sync("textDocument/codeAction", params, state.timeout_ms, bufnr)
 
-    if response and response.err then
-      notify(response.err.message or ("Code action failed: " .. kind), vim.log.levels.ERROR)
-    end
+      if response and response.err then
+        notify(response.err.message or ("Code action failed: " .. kind), vim.log.levels.ERROR)
+      end
 
-    for _, action in ipairs((response and response.result) or {}) do
-      if action.kind and action.kind:find(kind, 1, true) == 1 then
-        local ok = apply_code_action(action, client)
-        applied = ok or applied
-        if ok and not opts.apply_all then
-          return true
+      for _, action in ipairs((response and response.result) or {}) do
+        if action.kind and action.kind:find(kind, 1, true) == 1 then
+          local ok = apply_code_action(action, client)
+          applied = ok or applied
+          if ok and not opts.apply_all then
+            return true
+          end
         end
       end
     end

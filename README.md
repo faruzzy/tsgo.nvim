@@ -167,7 +167,8 @@ local tsgo_blink = require("tsgo").compat.blink({
 ## Commands
 
 - `:TsgoOrganizeImports`
-- `:TsgoAddMissingImports`
+- `:TsgoAddMissingImports` falls back to the import quickfixes on missing-name
+  diagnostics when tsgo does not advertise `source.addMissingImports`.
 - `:TsgoRemoveUnused`
 - `:TsgoFixAll`
 - `:TsgoImports`
