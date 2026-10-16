@@ -102,13 +102,15 @@ require("tsgo").setup({
 })
 ```
 
-When `cmd` is omitted, tsgo.nvim resolves `tsgo` with `vim.fn.exepath()`, then
-falls back to the plain `tsgo` command. This works for npm, Homebrew, nvm, fnm,
-asdf, mise, Volta, and other installers as long as Neovim inherits the directory
-containing `tsgo` in `$PATH`.
+When `cmd` is omitted, tsgo.nvim resolves `tsgo` with `vim.fn.exepath()`. If
+that fails, it asks `mise which tsgo` and then checks mise's Node installs
+(`$MISE_DATA_DIR`, default `~/.local/share/mise`), before falling back to the
+plain `tsgo` command. This works for npm, Homebrew, nvm, fnm, asdf, mise, Volta,
+and other installers as long as Neovim inherits the directory containing `tsgo`
+in `$PATH`, and for mise even when it doesn't.
 
-If Neovim starts from a GUI or project shell where `tsgo` is not on `$PATH`,
-provide an explicit command:
+If Neovim starts from a GUI or project shell where `tsgo` is not on `$PATH` and
+isn't installed through mise, provide an explicit command:
 
 ```lua
 require("tsgo").setup({
