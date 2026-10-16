@@ -78,13 +78,45 @@ function M.object_property_prefix_at(line, col)
   return before_cursor:match("^%s*([%w_$]*)$") or before_cursor:match("[{,]%s*([%w_$]*)$")
 end
 
-function M.object_property_prefix_from_context(ctx)
-  if ctx and ctx.line and ctx.cursor and ctx.cursor[2] then
-    return M.object_property_prefix_at(ctx.line, ctx.cursor[2])
+-- The line patterns alone also match any statement that starts with an
+-- identifier, so confirm with treesitter that the cursor is inside an object.
+-- Returns true when treesitter can't tell (no parser, or a parse error).
+local function inside_object(bufnr, row, col)
+  local ok, node = pcall(vim.treesitter.get_node, {
+    bufnr = bufnr,
+    pos = { row, math.max(col - 1, 0) },
+    ignore_injections = false,
+  })
+  if not ok or not node then
+    return true
   end
 
-  local col = vim.api.nvim_win_get_cursor(0)[2]
-  return M.object_property_prefix_at(vim.api.nvim_get_current_line(), col)
+  while node do
+    local node_type = node:type()
+    if node_type == "object" or node_type == "object_pattern" or node_type == "ERROR" then
+      return true
+    end
+    node = node:parent()
+  end
+
+  return false
+end
+
+function M.object_property_prefix_from_context(ctx)
+  local bufnr, row, col, line
+  if ctx and ctx.line and ctx.cursor and ctx.cursor[2] then
+    bufnr, row, col, line = ctx.bufnr or 0, ctx.cursor[1] - 1, ctx.cursor[2], ctx.line
+  else
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    bufnr, row, col, line = 0, cursor[1] - 1, cursor[2], vim.api.nvim_get_current_line()
+  end
+
+  local prefix = M.object_property_prefix_at(line, col)
+  if prefix == nil or not inside_object(bufnr, row, col) then
+    return nil
+  end
+
+  return prefix
 end
 
 function M.is_object_property_completion()
