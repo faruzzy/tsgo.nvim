@@ -1,3 +1,5 @@
+local util = require("tsgo.util")
+
 local M = {}
 
 local DEFAULT_TS_FILETYPES = {
@@ -96,7 +98,7 @@ local function apply_code_action(action, client)
       return false
     end
 
-    local response = client.request_sync("workspace/executeCommand", command, state.timeout_ms)
+    local response = client:request_sync("workspace/executeCommand", command, state.timeout_ms)
     if response and response.err then
       notify(response.err.message or "Failed to execute tsgo command.", vim.log.levels.ERROR)
       return false
@@ -217,6 +219,21 @@ local function add_missing_imports_via_quickfix(client, bufnr)
   return applied
 end
 
+-- Source actions apply to the whole file, so the range spans bufnr itself rather than
+-- the cursor of whichever window is current
+local function source_action_params(bufnr, encoding)
+  local last = vim.api.nvim_buf_line_count(bufnr) - 1
+  local last_line = vim.api.nvim_buf_get_lines(bufnr, last, last + 1, true)[1]
+
+  return {
+    textDocument = vim.lsp.util.make_text_document_params(bufnr),
+    range = {
+      start = { line = 0, character = 0 },
+      ["end"] = { line = last, character = vim.lsp.util.character_offset(bufnr, last, #last_line, encoding) },
+    },
+  }
+end
+
 local function code_action_sync(kind, opts)
   opts = opts or {}
   local bufnr = current_bufnr(opts.bufnr)
@@ -236,7 +253,7 @@ local function code_action_sync(kind, opts)
         return true
       end
     else
-      local params = vim.lsp.util.make_range_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
+      local params = source_action_params(bufnr, client.offset_encoding or "utf-16")
       params.context = {
         diagnostics = {},
         only = { kind },
@@ -343,16 +360,26 @@ function M.source_definition(opts)
     return
   end
 
-  local client = tsgo_clients(bufnr)[1]
-  local params = vim.lsp.util.make_position_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
+  -- The position comes from a cursor, so it needs a window that shows bufnr
+  local win = util.window_for_buf(bufnr)
+  if not win then
+    notify("Buffer " .. bufnr .. " is not displayed in a window.", vim.log.levels.WARN)
+    return
+  end
 
-  client.request("workspace/executeCommand", {
+  local client = tsgo_clients(bufnr)[1]
+  local params = vim.lsp.util.make_position_params(win, client.offset_encoding or "utf-16")
+
+  client:request("workspace/executeCommand", {
     command = "typescript.goToSourceDefinition",
     arguments = { params.textDocument.uri, params.position },
   }, function(err, result)
     if err or not result or vim.tbl_isempty(result) then
       vim.schedule(function()
-        vim.lsp.buf.definition()
+        -- vim.lsp.buf.definition() works on the current window, so run it in win
+        if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == bufnr then
+          vim.api.nvim_win_call(win, vim.lsp.buf.definition)
+        end
       end)
       return
     end

@@ -1,3 +1,5 @@
+local util = require("tsgo.util")
+
 local M = {}
 
 local state = {
@@ -18,13 +20,14 @@ function M.configure(opts)
   state = vim.tbl_deep_extend("force", state, opts or {})
 end
 
-local function trigger_character()
-  local col = vim.api.nvim_win_get_cursor(0)[2]
+local function trigger_character(win)
+  local row, col = unpack(vim.api.nvim_win_get_cursor(win))
   if col <= 0 then
     return nil
   end
 
-  local char = vim.api.nvim_get_current_line():sub(col, col)
+  local line = vim.api.nvim_buf_get_lines(vim.api.nvim_win_get_buf(win), row - 1, row, true)[1]
+  local char = line:sub(col, col)
   if char == "(" or char == "," then
     return char
   end
@@ -46,9 +49,16 @@ function M.help(opts)
     return vim.lsp.buf.signature_help()
   end
 
+  -- The position comes from a cursor, so it needs a window that shows bufnr
+  local win = util.window_for_buf(bufnr)
+  if not win then
+    vim.notify("Buffer " .. bufnr .. " is not displayed in a window.", vim.log.levels.WARN, { title = "tsgo.nvim" })
+    return
+  end
+
   local client = clients[1]
-  local params = vim.lsp.util.make_position_params(vim.api.nvim_get_current_win(), client.offset_encoding or "utf-16")
-  local char = opts.trigger_character or trigger_character()
+  local params = vim.lsp.util.make_position_params(win, client.offset_encoding or "utf-16")
+  local char = opts.trigger_character or trigger_character(win)
 
   params.context = {
     triggerKind = char and trigger_kind.TriggerCharacter or trigger_kind.Invoked,
@@ -56,13 +66,18 @@ function M.help(opts)
     isRetrigger = false,
   }
 
-  client.request("textDocument/signatureHelp", params, function(err, result, ctx)
+  client:request("textDocument/signatureHelp", params, function(err, result, ctx)
     if err then
       vim.notify(err.message or "Signature help failed.", vim.log.levels.WARN, { title = "tsgo.nvim" })
       return
     end
 
-    signature_help_handler()(nil, result, ctx, opts.handler_opts or {})
+    -- The handler only shows help for the current buffer and anchors it to the cursor, so run it in win
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == bufnr then
+      vim.api.nvim_win_call(win, function()
+        signature_help_handler()(nil, result, ctx, opts.handler_opts or {})
+      end)
+    end
   end, bufnr)
 end
 

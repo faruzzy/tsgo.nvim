@@ -10,6 +10,17 @@ function M.filetype_set(filetypes)
   return result
 end
 
+-- A window showing bufnr, preferring the current one; nil when the buffer is not displayed
+function M.window_for_buf(bufnr)
+  local win = vim.api.nvim_get_current_win()
+  if vim.api.nvim_win_get_buf(win) == bufnr then
+    return win
+  end
+
+  win = vim.fn.bufwinid(bufnr)
+  return win ~= -1 and win or nil
+end
+
 function M.is_member_completion()
   return M.member_prefix() ~= nil
 end
