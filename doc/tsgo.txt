@@ -43,7 +43,8 @@ available:
 
 tsgo.nvim starts tsgo only when it finds tsconfig.json or jsconfig.json. This
 avoids TypeScript inferred-project mode, which can be expensive in package-only
-or generated-code-heavy projects.
+or generated-code-heavy projects. Set allow_inferred_project to fall back to
+package.json/.git roots, or to the file's own directory when neither exists:
 >
   require("tsgo").setup({
     allow_inferred_project = true,

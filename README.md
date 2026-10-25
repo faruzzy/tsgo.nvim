@@ -85,7 +85,8 @@ By default, tsgo.nvim avoids TypeScript's inferred-project mode and only starts
 `tsgo` for files under `tsconfig.json` or `jsconfig.json`. This keeps projects
 with nonstandard config names, generated output, or package-only roots from
 causing expensive server-side project discovery. To allow package.json/.git
-fallback roots anyway:
+fallback roots anyway (files outside any package or repo then root at their own
+directory, like loose files in VS Code):
 
 ```lua
 require("tsgo").setup({

@@ -45,17 +45,15 @@ end
 
 function M.find(path)
   local root = find_root(path, state.project_root_markers)
-  if root then
-    local boundary = find_root(path, state.fallback_root_markers)
-    if boundary and not is_at_or_under(root, boundary) then
-      return nil
-    end
-
+  local boundary = find_root(path, state.fallback_root_markers)
+  -- A tsconfig above the package/repo boundary belongs to something else; ignore it
+  if root and not (boundary and not is_at_or_under(root, boundary)) then
     return root
   end
 
   if state.allow_inferred_project then
-    return find_root(path, state.fallback_root_markers)
+    -- Loose files outside any package or repo (scratch dirs) root at their own directory
+    return boundary or dirname(path)
   end
 
   return nil
